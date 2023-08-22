@@ -37,21 +37,23 @@ func (rf *Raft) sendAppendSL(server int, heartbeats bool) {
 
 	next := rf.nextIndex[server]
 
-	if next <= 0 {
-		next = 1
+	if next <= rf.lastIncludedIndex {
+		next = rf.lastIncludedIndex + 1
 	}
 	if next-1 > rf.log.lastLogIndex() {
 		next = rf.log.lastLogIndex()
 	}
+
+	prevLog := rf.entry(next - 1)
 	args := &AppendEntryArgs{
 		Term:         rf.currentTerm,
 		LeaderId:     rf.me,
 		LeaderCommit: rf.commitIndex,
 		PrevLogIndex: next - 1,
-		PrevLogTerm:  rf.log.Entries[next-1].Term,
+		PrevLogTerm:  prevLog.Term,
 		Entries:      make([]Entry, rf.log.lastLogIndex()-next+1),
 	}
-	copy(args.Entries, rf.slice(next))
+	copy(args.Entries, rf.slice(next-rf.lastIncludedIndex))
 	//DPrintf("leader %d send appendEntry to follower %d with arg %v\n", rf.me, server, args)
 	go func() {
 		var reply AppendEntryReply
@@ -70,6 +72,7 @@ func (rf *Raft) sendAppendSL(server int, heartbeats bool) {
 func (rf *Raft) processReplyTermL(server int, args *AppendEntryArgs, reply *AppendEntryReply) {
 	if rf.currentTerm < args.Term {
 		rf.newTerm(reply.Term)
+		rf.persist()
 	} else if rf.currentTerm == args.Term {
 		rf.processReply(server, args, reply)
 	}
@@ -106,7 +109,9 @@ func (rf *Raft) processReply(server int, args *AppendEntryArgs, reply *AppendEnt
 		DPrintf("follower[%d] with Conflict reply %v\n", server, reply)
 		if reply.ConflictTerm != -1 {
 			index := rf.findLastConflictIndex(reply.ConflictTerm)
-			DPrintf(" find last index = %d, term = %d\n", index, rf.entry(index).Term)
+			if index != -1 {
+				DPrintf(" find last index = %d, term = %d\n", index, rf.entry(index).Term)
+			}
 			if index != -1 {
 				rf.nextIndex[server] = index + 1
 			} else {
@@ -175,6 +180,7 @@ func (rf *Raft) AppendEnties(args *AppendEntryArgs, reply *AppendEntryReply) {
 
 	if args.Term > rf.currentTerm {
 		rf.newTerm(args.Term)
+		rf.persist()
 	}
 	if rf.role == Candidate {
 		rf.role = Follower
@@ -213,6 +219,7 @@ func (rf *Raft) AppendEnties(args *AppendEntryArgs, reply *AppendEntryReply) {
 		rf.commitIndex = Min(args.LeaderCommit, rf.log.lastLogIndex())
 		rf.signalApplier()
 	}
+	rf.persist()
 	//DPrintf("rf.commitIndex = %d\n", rf.commitIndex)
 
 }

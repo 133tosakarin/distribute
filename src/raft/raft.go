@@ -20,12 +20,15 @@ package raft
 import (
 	//	"bytes"
 
+	"bytes"
+	"log"
 	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	//	"6.824/labgob"
+	"6.824/labgob"
 	"6.824/labrpc"
 )
 
@@ -78,6 +81,7 @@ type Raft struct {
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
 
+	snapshot          []byte
 	lastIncludedIndex int
 	lastIncludedTerm  int
 }
@@ -108,6 +112,16 @@ func (rf *Raft) GetState() (int, bool) {
 // see paper's Figure 2 for a description of what should be persistent.
 //
 func (rf *Raft) persist() {
+
+	w := new(bytes.Buffer)
+	e := labgob.NewEncoder(w)
+	e.Encode(rf.currentTerm)
+	e.Encode(rf.voteFor)
+	e.Encode(rf.log)
+	e.Encode(rf.lastIncludedIndex)
+	e.Encode(rf.lastIncludedTerm)
+	data := w.Bytes()
+	rf.persister.SaveRaftState(data)
 	// Your code here (2C).
 	// Example:
 	// w := new(bytes.Buffer)
@@ -125,6 +139,27 @@ func (rf *Raft) readPersist(data []byte) {
 	if data == nil || len(data) < 1 { // bootstrap without any state?
 		return
 	}
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+
+	r := bytes.NewBuffer(data)
+	d := labgob.NewDecoder(r)
+
+	var term int
+	var votefor int
+	var logs Log
+	var lastIncludedIndex int
+	var lastIncludedTerm int
+	if d.Decode(&term) != nil || d.Decode(&votefor) != nil ||
+		d.Decode(&logs) != nil || d.Decode(&lastIncludedIndex) != nil ||
+		d.Decode(&lastIncludedTerm) != nil {
+		log.Fatal("readPersister error\n")
+	}
+	rf.currentTerm = term
+	rf.voteFor = votefor
+	rf.log = logs
+	rf.lastIncludedIndex = lastIncludedIndex
+	rf.lastIncludedTerm = lastIncludedTerm
 	// Your code here (2C).
 	// Example:
 	// r := bytes.NewBuffer(data)
@@ -157,7 +192,22 @@ func (rf *Raft) CondInstallSnapshot(lastIncludedTerm int, lastIncludedIndex int,
 // that index. Raft should now trim its log as much as possible.
 func (rf *Raft) Snapshot(index int, snapshot []byte) {
 	// Your code here (2D).
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 
+	if index <= rf.lastIncludedIndex {
+		DPrintf("index = %d, had been snapshoted\n", index)
+		return
+	}
+	index = Min(index, rf.log.lastLogIndex())
+	var newLog Log
+	newLog.append(Entry{Term: rf.entry(index).Term, Command: rf.entry(index).Command})
+	newLog.append(rf.slice(index)...)
+	rf.log = newLog
+	rf.lastIncludedIndex = index
+	rf.lastIncludedTerm = rf.entry(index).Term
+	rf.snapshot = snapshot
+	rf.signalApplier()
 }
 
 //
@@ -200,14 +250,15 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	if args.Term > rf.currentTerm {
 		rf.newTerm(args.Term)
+		rf.persist()
 	}
-
 	uptodate := args.LastLogTerm == rf.log.lastLogTerm() &&
 		args.LastLogIndex >= rf.log.lastLogIndex() || args.LastLogTerm > rf.log.lastLogTerm()
 	if (rf.voteFor == -1 || args.CandidateId == rf.voteFor) && uptodate {
 		reply.VoteGranted = true
 		rf.voteFor = args.CandidateId
 		rf.role = Follower
+		rf.persist()
 		rf.resetElection()
 	}
 
@@ -274,6 +325,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.log.append(Entry{Term: rf.currentTerm, Command: command})
 	DPrintf("leader %d append new log with length = %d\n", rf.me, rf.log.len())
 	index = rf.log.lastLogIndex()
+	rf.persist()
 	// Your code here (2B).
 	rf.sendAppendL(false)
 	return index, term, isLeader
