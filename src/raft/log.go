@@ -51,3 +51,11 @@ func (rf *Raft) slice(index int) []Entry {
 	idx := rf.entryIndex(index)
 	return rf.log.Entries[idx:]
 }
+
+func (rf *Raft) lastLogIndex() int {
+	return rf.lastIncludedIndex + len(rf.log.Entries) - 1
+}
+
+func (rf *Raft) realIndex(index int) int {
+	return rf.lastIncludedIndex + index
+}

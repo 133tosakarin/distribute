@@ -514,6 +514,7 @@ func (cfg *config) nCommitted(index int) (int, interface{}) {
 				cfg.t.Fatalf("committed values do not match: index %v, %v, %v",
 					index, cmd, cmd1)
 			}
+			//DPrintf("config ok , cmd = %d\n", cmd1)
 			count += 1
 			cmd = cmd1
 		}
@@ -600,6 +601,7 @@ func (cfg *config) one(cmd interface{}, expectedServers int, retry bool) int {
 					// committed
 					if cmd1 == cmd {
 						// and it was the command we submitted.
+						//DPrintf("return %d with cmd = %d\n", index, cmd1)
 						return index
 					}
 				}

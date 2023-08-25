@@ -8,12 +8,14 @@ package raft
 // test with the original before submitting.
 //
 
-import "testing"
-import "fmt"
-import "time"
-import "math/rand"
-import "sync/atomic"
-import "sync"
+import (
+	"fmt"
+	"math/rand"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+)
 
 // The tester generously allows solutions to complete elections in one second
 // (much more than the paper's range of timeouts).
@@ -1128,15 +1130,18 @@ func snapcommon(t *testing.T, name string, disconnect bool, reliable bool, crash
 
 		if disconnect {
 			cfg.disconnect(victim)
+			DPrintf("victim %d disconnect\n", victim)
 			cfg.one(rand.Int(), servers-1, true)
 		}
 		if crash {
+			fmt.Printf("%d victim crashed\n", victim)
 			cfg.crash1(victim)
 			cfg.one(rand.Int(), servers-1, true)
 		}
 
 		// perhaps send enough to get a snapshot
 		nn := (SnapShotInterval / 2) + (rand.Int() % SnapShotInterval)
+		DPrintf("sender %d start %d task\n", sender, nn)
 		for i := 0; i < nn; i++ {
 			cfg.rafts[sender].Start(rand.Int())
 		}
@@ -1146,7 +1151,9 @@ func snapcommon(t *testing.T, name string, disconnect bool, reliable bool, crash
 			// make sure all followers have caught up, so that
 			// an InstallSnapshot RPC isn't required for
 			// TestSnapshotBasic2D().
+			DPrintf("start test basic2D\n")
 			cfg.one(rand.Int(), servers, true)
+			DPrintf("all follower catch up\n")
 		} else {
 			cfg.one(rand.Int(), servers-1, true)
 		}
@@ -1157,12 +1164,15 @@ func snapcommon(t *testing.T, name string, disconnect bool, reliable bool, crash
 		if disconnect {
 			// reconnect a follower, who maybe behind and
 			// needs to rceive a snapshot to catch up.
+			DPrintf("%d victime reconnect\n", victim)
 			cfg.connect(victim)
 			cfg.one(rand.Int(), servers, true)
 			leader1 = cfg.checkOneLeader()
+			DPrintf("this time leader is %d\n", leader1)
 		}
 		if crash {
 			cfg.start1(victim, cfg.applierSnap)
+			fmt.Printf("%d reconnect\n", victim)
 			cfg.connect(victim)
 			cfg.one(rand.Int(), servers, true)
 			leader1 = cfg.checkOneLeader()

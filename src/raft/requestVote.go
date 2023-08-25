@@ -43,7 +43,7 @@ func (rf *Raft) startElect() {
 	args := &RequestVoteArgs{
 		Term:         rf.currentTerm,
 		CandidateId:  rf.me,
-		LastLogIndex: rf.log.lastLogIndex(),
+		LastLogIndex: rf.lastLogIndex(),
 		LastLogTerm:  rf.log.lastLogTerm(),
 	}
 	votes := 1
@@ -58,7 +58,7 @@ func (rf *Raft) becomeLeader() {
 	rf.role = Leader
 	//DPrintf("%d become leader\n", rf.me)
 	for i, _ := range rf.peers {
-		rf.nextIndex[i] = rf.log.lastLogIndex() + 1
+		rf.nextIndex[i] = rf.lastLogIndex() + 1
 	}
 }
 func (rf *Raft) sendRequestVoteL(server int, args *RequestVoteArgs, vote *int) {
@@ -71,6 +71,7 @@ func (rf *Raft) sendRequestVoteL(server int, args *RequestVoteArgs, vote *int) {
 		defer rf.mu.Unlock()
 		if reply.Term > rf.currentTerm {
 			rf.newTerm(reply.Term)
+			rf.persist()
 			DPrintf("change role to Follower\n")
 		}
 		if reply.VoteGranted {
@@ -79,11 +80,12 @@ func (rf *Raft) sendRequestVoteL(server int, args *RequestVoteArgs, vote *int) {
 			//DPrintf("receive %d reply %v, vote = %d, rf.role = %d\n", server, reply, *vote, rf.role)
 			if *vote == len(rf.peers)/2+1 && rf.role == Candidate {
 				if rf.currentTerm == args.Term {
-					DPrintf("%d become leader with term %d\n", rf.me, rf.currentTerm)
+					//fmt.Printf("%d become leader with term %d\n", rf.me, rf.currentTerm)
 
 					rf.becomeLeader()
 					//rf.resetElection()
 					rf.sendAppendL(true)
+					rf.persist()
 				}
 			}
 		}
