@@ -81,7 +81,7 @@ func (rf *Raft) sendRequestVoteL(server int, args *RequestVoteArgs, vote *int) {
 			if *vote == len(rf.peers)/2+1 && rf.role == Candidate {
 				if rf.currentTerm == args.Term {
 					//fmt.Printf("%d become leader with term %d\n", rf.me, rf.currentTerm)
-
+					//fmt.Printf("rf.leader is: %d\n", rf.me)
 					rf.becomeLeader()
 					//rf.resetElection()
 					rf.sendAppendL(true)

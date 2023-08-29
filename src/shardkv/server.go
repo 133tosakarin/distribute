@@ -1,7 +1,6 @@
 package shardkv
 
 import (
-	"log"
 	"sync"
 
 	"6.824/labgob"
@@ -30,11 +29,15 @@ type ShardKV struct {
 
 func (kv *ShardKV) Get(args *GetArgs, reply *GetReply) {
 	// Your code here.
-	log.Printf("args :%v, reply is: %v\n", args, reply)
+	//log.Printf("args :%v, reply is: %v\n", args, reply)
+	reply.Value = "hello"
+
 }
 
 func (kv *ShardKV) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
 	// Your code here.
+	//reply.Err = OK
+	//fmt.Printf("with args: %v to call putAppend\n", args)
 }
 
 //

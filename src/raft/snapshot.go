@@ -70,7 +70,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 
 	if rf.currentTerm < args.Term {
 		rf.newTerm(args.Term)
-		rf.persist()
+		rf.persistWithSnapshot(args.Data)
 	}
 	rf.resetElection()
 	if rf.lastIncludedIndex >= args.LastIncludedIndex {

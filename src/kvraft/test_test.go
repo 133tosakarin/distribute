@@ -1,16 +1,19 @@
 package kvraft
 
-import "6.824/porcupine"
-import "6.824/models"
-import "testing"
-import "strconv"
-import "time"
-import "math/rand"
-import "strings"
-import "sync"
-import "sync/atomic"
-import "fmt"
-import "io/ioutil"
+import (
+	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"6.824/models"
+	"6.824/porcupine"
+)
 
 // The tester generously allows solutions to complete elections in one second
 // (much more than the paper's range of timeouts).
@@ -400,17 +403,20 @@ func GenericTestSpeed(t *testing.T, part string, maxraftstate int) {
 
 	// wait until first op completes, so we know a leader is elected
 	// and KV servers are ready to process client requests
+
+	DPrintf("get..............\n")
 	ck.Get("x")
 
 	start := time.Now()
 	for i := 0; i < numOps; i++ {
+		DPrintf("apped\n")
 		ck.Append("x", "x 0 "+strconv.Itoa(i)+" y")
 	}
 	dur := time.Since(start)
 
 	v := ck.Get("x")
 	checkClntAppends(t, 0, v, numOps)
-
+	DPrintf("......................\n")
 	// heartbeat interval should be ~ 100 ms; require at least 3 ops per
 	const heartbeatInterval = 100 * time.Millisecond
 	const opsPerInterval = 3
@@ -610,11 +616,13 @@ func TestSnapshotRPC3B(t *testing.T) {
 	Put(cfg, ck, "a", "A", nil, -1)
 	check(cfg, t, ck, "a", "A")
 
-	// a bunch of puts into the majority partition.
+	//// a bunch of puts into the majority partition.
+	//DPrintf("..........................adfafdsfadsff\n")
 	cfg.partition([]int{0, 1}, []int{2})
 	{
 		ck1 := cfg.makeClient([]int{0, 1})
 		for i := 0; i < 50; i++ {
+			//DPrintf("%d\n", i)
 			Put(cfg, ck1, strconv.Itoa(i), strconv.Itoa(i), nil, -1)
 		}
 		time.Sleep(electionTimeout)
@@ -623,6 +631,7 @@ func TestSnapshotRPC3B(t *testing.T) {
 
 	// check that the majority partition has thrown away
 	// most of its log entries.
+	//DPrintf("..........................\n")
 	sz := cfg.LogSize()
 	if sz > 8*maxraftstate {
 		t.Fatalf("logs were not trimmed (%v > 8*%v)", sz, maxraftstate)

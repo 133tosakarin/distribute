@@ -106,6 +106,12 @@ func (rf *Raft) GetState() (int, bool) {
 	return term, isleader
 }
 
+func (rf *Raft) GetRaftSize() int {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	return rf.persister.RaftStateSize()
+}
+
 //
 // save Raft's persistent state to stable storage,
 // where it can later be retrieved after a crash and restart.
@@ -335,14 +341,16 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 //
 func (rf *Raft) Start(command interface{}) (int, int, bool) {
 
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
 	index := -1
 	term := rf.currentTerm
 	isLeader := true
 	if rf.role != Leader {
+
 		return -1, term, false
 	}
-	rf.mu.Lock()
-	defer rf.mu.Unlock()
+
 	rf.log.append(Entry{Term: rf.currentTerm, Command: command})
 	DPrintf("leader %d append new log with length = %d\n", rf.me, rf.log.len())
 	index = rf.lastLogIndex()
